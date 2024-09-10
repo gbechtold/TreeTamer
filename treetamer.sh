@@ -1,11 +1,14 @@
 #!/bin/bash
 
 # 🌳 TreeTamer: A tool to flatten project directory structures
-# Version 1.0.0
+# Version 1.1.0
 
 # Set the source and destination directories
 SRC_DIR="."
 DEST_DIR="./tamed_tree"
+
+# Default exclusions
+DEFAULT_EXCLUDE="node_modules,target,.git,.idea,build,dist,venv,__pycache__"
 
 # Function to display help message
 display_help() {
@@ -15,16 +18,20 @@ display_help() {
     echo "Options:"
     echo "  -h, --help        🔍 Display this help message"
     echo "  -c, --clean       🧹 Remove existing destination directory before flattening"
-    echo "  -e, --exclude     🚫 Comma-separated list of directories to exclude"
+    echo "  -e, --exclude     🚫 Comma-separated list of additional directories to exclude"
+    echo "  -i, --include     ✅ Comma-separated list of directories to include (overrides default exclusions)"
     echo "  -f, --filter      🔍 Comma-separated list of file extensions to include"
     echo "  -l, --links       🔗 How to handle symbolic links: 'follow', 'preserve', or 'ignore' (default: ignore)"
     echo
-    echo "Example: $0 -c -e node_modules,target -f js,py,txt -l preserve"
+    echo "Default excluded directories: $DEFAULT_EXCLUDE"
+    echo
+    echo "Example: $0 -c -e logs,temp -i node_modules -f js,py,txt -l preserve"
 }
 
 # Parse command-line options
 CLEAN=false
 EXCLUDE=""
+INCLUDE=""
 FILTER=""
 LINK_HANDLING="ignore"
 
@@ -40,6 +47,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -e|--exclude)
             EXCLUDE=$2
+            shift 2
+            ;;
+        -i|--include)
+            INCLUDE=$2
             shift 2
             ;;
         -f|--filter)
@@ -68,11 +79,18 @@ fi
 mkdir -p "$DEST_DIR"
 
 # Prepare find command
-FIND_CMD="find \"$SRC_DIR\" -type f ! -path \"*/.git/*\" ! -name \"$(basename "$0")\" ! -path \"$DEST_DIR/*\""
+FIND_CMD="find \"$SRC_DIR\" -type f ! -name \"$(basename "$0")\" ! -path \"$DEST_DIR/*\""
 
-# Add exclusions to find command
-if [ -n "$EXCLUDE" ]; then
-    IFS=',' read -ra EXCLUDE_ARRAY <<< "$EXCLUDE"
+# Handle exclusions and inclusions
+if [ -n "$INCLUDE" ]; then
+    # If directories are explicitly included, only use those
+    IFS=',' read -ra INCLUDE_ARRAY <<< "$INCLUDE"
+    for i in "${INCLUDE_ARRAY[@]}"; do
+        FIND_CMD+=" ! -path \"*/$i/*\""
+    done
+else
+    # Use default exclusions and any additional user-specified exclusions
+    IFS=',' read -ra EXCLUDE_ARRAY <<< "$DEFAULT_EXCLUDE,$EXCLUDE"
     for i in "${EXCLUDE_ARRAY[@]}"; do
         FIND_CMD+=" ! -path \"*/$i/*\""
     done
