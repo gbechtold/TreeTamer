@@ -12,6 +12,12 @@ TreeTamer is a powerful bash script that flattens your project's directory struc
 - 📊 Progress indication
 - 🌲 Generates a tree structure of the original project
 
+## ✨ Quickinstall
+
+```bash
+curl -O https://raw.githubusercontent.com/gbechtold/TreeTamer/main/treetamer.sh
+```
+
 ## 🚀 Usage
 
 ```bash
