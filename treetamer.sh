@@ -1,180 +1,218 @@
 #!/bin/bash
 
 # 🌳 TreeTamer: A tool to flatten project directory structures
-# Version 1.1.1
+# Version 1.2.2
 
 # Set the source and destination directories
 SRC_DIR="."
 DEST_DIR="./tamed_tree"
 
-# Default exclusions
-DEFAULT_EXCLUDE="node_modules,target,output,logs,package-lock.json,.DS_Store,.git,.idea,build,dist,venv,__pycache__,*.com,*.class,*.dll,*.exe,*.o,*.so,*.7z,*.dmg,*.gz,*.iso,*.jar,*.rar,*.tar,*.zip,*.log,*.sql,*.sqlite,.DS_Store,.DS_Store?,._*,.Spotlight-V100,.Trashes,ehthumbs.db,Thumbs.db"
+# Default file extensions to include (projektspezifische Dateien)
+DEFAULT_EXTENSIONS=(
+    # Code Files
+    "js"
+    "jsx"
+    "ts"
+    "tsx"
+    "css"
+    "scss"
+    "less"
+    "html"
+    "vue"
+    "php"
+    "py"
+    "java"
+    "rb"
+    "go"
+    "rs"
+    "sql"
+    # Config Files
+    "yml"
+    "yaml"
+)
 
-# Function to display help message
-display_help() {
-    echo "🌳 TreeTamer: Flatten your project's directory structure"
-    echo "Usage: $0 [OPTIONS]"
-    echo
-    echo "Options:"
-    echo "  -h, --help        🔍 Display this help message"
-    echo "  -c, --clean       🧹 Remove existing destination directory before flattening"
-    echo "  -e, --exclude     🚫 Comma-separated list of additional directories to exclude"
-    echo "  -i, --include     ✅ Comma-separated list of directories to include (overrides default exclusions)"
-    echo "  -f, --filter      🔍 Comma-separated list of file extensions to include"
-    echo "  -l, --links       🔗 How to handle symbolic links: 'follow', 'preserve', or 'ignore' (default: ignore)"
-    echo
-    echo "Default excluded directories: $DEFAULT_EXCLUDE"
-    echo
-    echo "Example: $0 -c -e logs,temp -i node_modules -f js,py,txt -l preserve"
+# Wichtige Projektdateien die immer inkludiert werden sollen
+IMPORTANT_PROJECT_FILES=(
+    ".gitignore"
+    "package.json"
+    "README.md"
+)
+
+# Wichtige Projektverzeichnisse die immer inkludiert werden sollen
+IMPORTANT_PROJECT_DIRS=(
+    "src/config/"
+    "src/modules/"
+)
+
+# Standard-Excludes (nicht projektspezifische Dateien)
+EXCLUDE_PATTERNS=(
+    # Dependency Verzeichnisse
+    "node_modules/"
+    "vendor/"
+    "bower_components/"
+    ".next/"
+    "dist/"
+    "build/"
+    "target/"
+    "out/"
+    "output/"
+    "logs/"
+    "coverage/"
+    "tmp/"
+    "temp/"
+    ".sass-cache/"
+    "__pycache__/"
+    ".pytest_cache/"
+    "venv/"
+    ".venv/"
+    "env/"
+    ".env/"
+    
+    # Version Control (außer .gitignore)
+    ".git/"
+    ".svn/"
+    ".hg/"
+    
+    # IDE und Editor Dateien
+    ".idea/"
+    ".vscode/"
+    ".vs/"
+    "*.swp"
+    "*.swo"
+    ".DS_Store"
+    "Thumbs.db"
+    
+    # Build Artifacts
+    "*.pyc"
+    "*.pyo"
+    "*.pyd"
+    "*.so"
+    "*.dll"
+    "*.dylib"
+    "*.exe"
+    "*.obj"
+    "*.o"
+    
+    # Package Manager Dateien (außer package.json)
+    "package-lock.json"
+    "yarn.lock"
+    "composer.lock"
+    "Gemfile.lock"
+    "poetry.lock"
+    "pnpm-lock.yaml"
+    
+    # Konfigurationsdateien die ignoriert werden sollen
+    ".eslintrc*"
+    ".prettierrc*"
+    ".babelrc*"
+    "tsconfig.json"
+    "webpack.config.*"
+    "rollup.config.*"
+    "jest.config.*"
+    ".travis.yml"
+    ".gitlab-ci.yml"
+    "docker-compose*.yml"
+    "Dockerfile"
+    ".dockerignore"
+    ".env*"
+    ".editorconfig"
+    "browserslist"
+    ".browserslistrc"
+    "*.config.js"
+    "*.conf.js"
+    
+    # Archive
+    "*.zip"
+    "*.tar"
+    "*.gz"
+    "*.rar"
+    "*.7z"
+    
+    # Logs
+    "*.log"
+    "npm-debug.log*"
+    "yarn-debug.log*"
+    "yarn-error.log*"
+)
+
+# Build the find command
+build_find_command() {
+    local cmd="find \"$SRC_DIR\" -type f ! -name \"$(basename "$0")\" ! -path \"$DEST_DIR/*\""
+    
+    # Add exclusion patterns
+    for pattern in "${EXCLUDE_PATTERNS[@]}"; do
+        if [[ $pattern == *"/" ]]; then
+            cmd+=" ! -path \"*/${pattern}*\""
+        else
+            cmd+=" ! -name \"$pattern\""
+        fi
+    done
+
+    # Start conditions for files to include
+    cmd+=" \( "
+    
+    # Add default file extensions
+    local first=true
+    for ext in "${DEFAULT_EXTENSIONS[@]}"; do
+        if [ "$first" = true ]; then
+            cmd+=" -name \"*.$ext\""
+            first=false
+        else
+            cmd+=" -o -name \"*.$ext\""
+        fi
+    done
+
+    # Add important project files
+    for file in "${IMPORTANT_PROJECT_FILES[@]}"; do
+        cmd+=" -o -name \"$file\""
+    done
+
+    # Add important project directories
+    for dir in "${IMPORTANT_PROJECT_DIRS[@]}"; do
+        cmd+=" -o -path \"*/$dir*\""
+    done
+
+    cmd+=" \)"
+    
+    echo "$cmd"
 }
-
-# Parse command-line options
-CLEAN=false
-EXCLUDE=""
-INCLUDE=""
-FILTER=""
-LINK_HANDLING="ignore"
-
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        -h|--help)
-            display_help
-            exit 0
-            ;;
-        -c|--clean)
-            CLEAN=true
-            shift
-            ;;
-        -e|--exclude)
-            EXCLUDE=$2
-            shift 2
-            ;;
-        -i|--include)
-            INCLUDE=$2
-            shift 2
-            ;;
-        -f|--filter)
-            FILTER=$2
-            shift 2
-            ;;
-        -l|--links)
-            LINK_HANDLING=$2
-            shift 2
-            ;;
-        *)
-            echo "❌ Unknown option: $1"
-            display_help
-            exit 1
-            ;;
-    esac
-done
-
-# Clean existing destination directory if requested
-if [ "$CLEAN" = true ] && [ -d "$DEST_DIR" ]; then
-    echo "🧹 Removing existing tamed tree..."
-    rm -rf "$DEST_DIR"
-fi
 
 # Create the destination directory if it doesn't exist
 mkdir -p "$DEST_DIR"
 
-# Prepare find command
-FIND_CMD="find \"$SRC_DIR\" -type f ! -name \"$(basename "$0")\" ! -path \"$DEST_DIR/*\""
+# Build and execute find command
+FIND_CMD=$(build_find_command)
+echo "🔍 Suche nach projektspezifischen Dateien..."
 
-# Handle exclusions and inclusions
-if [ -n "$INCLUDE" ]; then
-    # If directories are explicitly included, only use those
-    IFS=',' read -ra INCLUDE_ARRAY <<< "$INCLUDE"
-    for i in "${INCLUDE_ARRAY[@]}"; do
-        FIND_CMD+=" ! -path \"*/$i/*\""
-    done
-else
-    # Use default exclusions and any additional user-specified exclusions
-    IFS=',' read -ra EXCLUDE_ARRAY <<< "$DEFAULT_EXCLUDE,$EXCLUDE"
-    for i in "${EXCLUDE_ARRAY[@]}"; do
-        # Prüfe, ob es sich um einen Dateinamen oder ein Verzeichnis handelt
-        if [[ $i == *.* ]] || [[ $i != *"/"* ]]; then
-            # Für Dateien: nutze -name
-            FIND_CMD+=" ! -name \"$i\""
-        else
-            # Für Verzeichnisse: nutze -path
-            FIND_CMD+=" ! -path \"*/$i/*\""
-        fi
-    done
-fi
-
-# Add file type filter to find command
-if [ -n "$FILTER" ]; then
-    FIND_CMD+=" \( "
-    IFS=',' read -ra FILTER_ARRAY <<< "$FILTER"
-    for i in "${FILTER_ARRAY[@]}"; do
-        FIND_CMD+=" -name \"*.$i\" -o"
-    done
-    FIND_CMD="${FIND_CMD% -o} \)"
-fi
-
-# Add symbolic link handling to find command
-case $LINK_HANDLING in
-    follow)
-        FIND_CMD+=" -L"
-        ;;
-    preserve)
-        FIND_CMD+=" -P"
-        ;;
-    ignore)
-        FIND_CMD+=" ! -type l"
-        ;;
-    *)
-        echo "⚠️  Invalid link handling option. Using 'ignore'."
-        FIND_CMD+=" ! -type l"
-        ;;
-esac
-
-# Function to generate a unique filename
-generate_unique_filename() {
-    local base_name=$1
-    local extension="${base_name##*.}"
-    local name="${base_name%.*}"
-    local counter=1
-    local new_name="$base_name"
-
-    while [[ -e "$DEST_DIR/$new_name" ]]; do
-        new_name="${name}_${counter}.${extension}"
-        ((counter++))
-    done
-
-    echo "$new_name"
-}
-
-# Process files
 total_files=$(eval "$FIND_CMD" | wc -l)
+if [ "$total_files" -eq 0 ]; then
+    echo "⚠️  Keine projektspezifischen Dateien gefunden!"
+    exit 0
+fi
+
+echo "🌳 Verarbeite $total_files Dateien..."
 processed_files=0
 
-echo "🌳 TreeTamer is working its magic..."
-
 eval "$FIND_CMD" -print0 | while IFS= read -r -d '' file; do
-    # Get the relative path of the file
+    # Get relative path and create new filename
     rel_path="${file#$SRC_DIR/}"
-    
-    # Replace directory separators with hyphens
     new_name=$(echo "$rel_path" | sed 's/\//-/g')
     
-    # Handle filename collisions
-    new_name=$(generate_unique_filename "$new_name")
-    
-    # Copy the file to the destination directory with the new name
-    rsync -a "$file" "$DEST_DIR/$new_name"
+    # Copy file
+    cp "$file" "$DEST_DIR/$new_name"
     
     # Update progress
     ((processed_files++))
     progress=$((processed_files * 100 / total_files))
-    printf "\r🚀 Progress: [%-50s] %d%%" $(printf "#%.0s" $(seq 1 $((progress / 2)))) "$progress"
+    printf "\r🚀 Fortschritt: [%-50s] %d%%" $(printf "#%.0s" $(seq 1 $((progress / 2)))) "$progress"
 done
 
-echo -e "\n✅ TreeTamer has successfully flattened your project into $DEST_DIR"
+echo -e "\n✅ Projekt wurde erfolgreich in $DEST_DIR kopiert"
 
-# Generate a tree structure of the original project
-tree -L 3 -I "tamed_tree|.git" > "$DEST_DIR/original_structure.txt"
+# Optional: Originale Projektstruktur dokumentieren
+if command -v tree &> /dev/null; then
+    tree -L 3 -I "tamed_tree|$(echo "${EXCLUDE_PATTERNS[@]}" | tr ' ' '|')" > "$DEST_DIR/original_structure.txt"
+    echo "📊 Originale Projektstruktur wurde in $DEST_DIR/original_structure.txt gespeichert"
+fi
 
-echo "📊 Original project structure saved to $DEST_DIR/original_structure.txt"
-echo "🎉 All done! Your wild directory tree has been tamed!"
+echo "🎉 Fertig! Projektdateien wurden erfolgreich extrahiert!"
