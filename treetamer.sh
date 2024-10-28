@@ -8,7 +8,7 @@ SRC_DIR="."
 DEST_DIR="./tamed_tree"
 
 # Default exclusions
-DEFAULT_EXCLUDE="node_modules,target,.git,.idea,build,dist,venv,__pycache__"
+DEFAULT_EXCLUDE="node_modules,target,output,logs,package-lock.json,.DS_Store,.git,.idea,build,dist,venv,__pycache__,*.com,*.class,*.dll,*.exe,*.o,*.so,*.7z,*.dmg,*.gz,*.iso,*.jar,*.rar,*.tar,*.zip,*.log,*.sql,*.sqlite,.DS_Store,.DS_Store?,._*,.Spotlight-V100,.Trashes,ehthumbs.db,Thumbs.db"
 
 # Function to display help message
 display_help() {
