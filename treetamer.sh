@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 🌳 TreeTamer: A tool to flatten project directory structures
-# Version 1.1.0
+# Version 1.1.1
 
 # Set the source and destination directories
 SRC_DIR="."
@@ -92,7 +92,14 @@ else
     # Use default exclusions and any additional user-specified exclusions
     IFS=',' read -ra EXCLUDE_ARRAY <<< "$DEFAULT_EXCLUDE,$EXCLUDE"
     for i in "${EXCLUDE_ARRAY[@]}"; do
-        FIND_CMD+=" ! -path \"*/$i/*\""
+        # Prüfe, ob es sich um einen Dateinamen oder ein Verzeichnis handelt
+        if [[ $i == *.* ]] || [[ $i != *"/"* ]]; then
+            # Für Dateien: nutze -name
+            FIND_CMD+=" ! -name \"$i\""
+        else
+            # Für Verzeichnisse: nutze -path
+            FIND_CMD+=" ! -path \"*/$i/*\""
+        fi
     done
 fi
 
